@@ -38,7 +38,7 @@ class LightState {
     boolean newState = root["led_on"] | DEFAULT_LED_STATE;
     if (lightState.ledOn != newState) {
       lightState.ledOn = newState;
-      return StateUpdateResult::CHANGED;
+      return StateUpdateResult::CHANGED;  
     }
     return StateUpdateResult::UNCHANGED;
   }
