@@ -1,4 +1,5 @@
 #include <RGBLightStateService.h>
+#include <ctime>
 
 RGBLightStateService::RGBLightStateService(AsyncWebServer* server, SecurityManager* securityManager, FS* fs) :
     _httpEndpoint(RGBLightState::read,
@@ -21,9 +22,9 @@ RGBLightStateService::RGBLightStateService(AsyncWebServer* server, SecurityManag
 }
 
 void RGBLightStateService::updateRGBLedState(RGBLightState& state) {
-  analogWrite(state.rPin, state.rValue);
-  analogWrite(state.gPin, state.gValue);
-  analogWrite(state.bPin, state.bValue);
+  analogWrite(state.pins.rPin, state.color.r);
+  analogWrite(state.pins.gPin, state.color.g);
+  analogWrite(state.pins.bPin, state.color.b);
 }
 
 void RGBLightStateService::onConfigUpdated(const String& originId) {
@@ -35,4 +36,37 @@ void RGBLightStateService::onConfigUpdated(const String& originId) {
 void RGBLightStateService::begin() {
   _fsPersistence.readFromFS();
   RGBLightStateService::updateRGBLedState(_state);
+}
+
+void RGBLightStateService::loop() {
+  time_t currentTime = time(nullptr);
+
+  // Check the schedules only once per second
+  if (_state.schedules.getSchedules().size() == 0 || currentTime - lastCheckTime < 1) {
+    return;
+  }
+
+  lastCheckTime = currentTime;  // Update last check time
+
+  // Iterate through the schedules to find any that should currently be active
+  bool foundActiveSchedule = false;
+  // Serial.println("Current Time:" +String(currentTime));
+  for (const auto& schedule : _state.schedules.getSchedules()) {
+    // Serial.println("Checking schedule: " + String(schedule.start) + " - " + String(schedule.end));
+    if (currentTime >= schedule.start && currentTime <= schedule.end) {
+      if (_state.color != schedule.color) {
+        _state.color = schedule.color;  
+        updateRGBLedState(_state);      
+      }
+      foundActiveSchedule = true;
+      break;  // one active schedule at a time
+    }
+  }
+
+  // If no active schedule is found and the light is on, you might want to turn it off or revert to a default state
+  if (!foundActiveSchedule && !_state.color.isOff()) {
+    Serial.println("No active schedule found, reverting to default state.");
+    // _state.color = RGBColour(0, 0, 0);  // Reset to no color
+    updateRGBLedState(_state);
+  }
 }

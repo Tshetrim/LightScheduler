@@ -27,6 +27,16 @@ void printLocalTime() {
   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");  // EX. Saturday, June 24 2017 14:05:49
 }
 
+void loopPrintTime() {
+  // Print the time at regular intervals
+  static unsigned long lastTimePrint = 0;
+  unsigned long currentTime = millis();
+  if (currentTime - lastTimePrint > 1000) {  // Every 1 second
+    printLocalTime();
+    lastTimePrint = currentTime;
+  }
+}
+
 void setup() {
   // start serial and filesystem
 
@@ -51,13 +61,8 @@ void setup() {
 
 void loop() {
   // run the framework's loop function
+  // time_t is in seconds 
   esp32React.loop();
-
-  // Print the time at regular intervals
-  static unsigned long lastTimePrint = 0;
-  unsigned long currentTime = millis();
-  if (currentTime - lastTimePrint > 1000) {  // Every 1 second
-    printLocalTime();
-    lastTimePrint = currentTime;
-  }
+  rgbLightStateService.loop();
+  loopPrintTime();
 }
