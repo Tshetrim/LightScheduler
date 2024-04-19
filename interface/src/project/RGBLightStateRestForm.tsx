@@ -93,7 +93,7 @@ const RGBLightStateRestForm: FC = () => {
 						key={index}
 						schedule={schedule}
 						onChange={handleScheduleChange(index)}
-						onRemove={() => handleRemoveSchedule(index)}
+						onRemove={handleRemoveSchedule(index)}
 					/>
 				))}
 
@@ -124,7 +124,9 @@ const RGBLightStateRestForm: FC = () => {
 										type="number"
 										inputProps={{ min: 0, max: 255 }}
 										value={pinValue}
-										onChange={(e) => handlePinsChange(pinKey as keyof RGBPins, parseInt(e.target.value))}
+										onChange={(e) =>
+											handlePinsChange(pinKey as keyof RGBPins, parseInt(e.target.value))
+										}
 										variant="outlined"
 									/>
 								</Grid>

@@ -59,6 +59,17 @@ const AutoLightInformation: FC = () => (
 				/>
 			</ListItem>
 			<ListItem>
+				<ListItemText
+					primary={
+						<span>
+							Changes are <strong style={{ color: "#1976d2" }}>not saved</strong> until the save button is
+							hit so if you need to revert, just <strong style={{ color: "#1976d2" }}>reload</strong> the
+							page.
+						</span>
+					}
+				/>
+			</ListItem>
+			<ListItem>
 				<ListItemText primary="Any manual color change will be overridden by the active schedule. If no schedule is set to follow, the last color remains active." />
 			</ListItem>
 			<ListItem>
@@ -75,7 +86,7 @@ const AutoLightInformation: FC = () => (
 		</List>
 
 		<Typography variant="body2" paragraph>
-			Happpy Scheduling!
+			Happpy Scheduling! 
 		</Typography>
 	</SectionContent>
 );
