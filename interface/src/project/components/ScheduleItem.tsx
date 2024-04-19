@@ -28,10 +28,7 @@ const ScheduleItem: FC<ScheduleItemProps> = ({ schedule, onChange, onRemove }) =
 			p: 2,
 			mb: 2,
 			backgroundColor: isActive ? "#e8f5e9" : isPast ? "#f0f0f0" : "inherit",
-			border: isActive ? "2px solid #4caf50" : "5px solid #e0e0e0",
-			"&:hover": {
-				backgroundColor: "inherit",
-			},
+			border: isActive ? "2px solid #4caf50" : isPast ? "5px solid #e0e0e0" : "2px solid #e0e0e0",
 			cursor: "pointer",
 			"& input": {
 				cursor: "pointer",
@@ -42,7 +39,7 @@ const ScheduleItem: FC<ScheduleItemProps> = ({ schedule, onChange, onRemove }) =
 
 	return (
 		<Tooltip
-			title={isPast ? "🔴 Schedule is past date and stale 🔴" : isActive ? "Currently Active" : "To be Active"}
+			title={isPast ? "🔴 Schedule is past date and stale 🔴" : isActive ? "🟢 Currently Active 🟢" : "⏰ To be Active ⏰"}
 			placement="top"
 		>
 			<Paper variant="outlined" sx={paperStyle}>
