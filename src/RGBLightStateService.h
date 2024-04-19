@@ -5,6 +5,11 @@
 #include <FSPersistence.h>
 #include <WebSocketTxRx.h>
 #include <type_traits>
+#include <chrono>
+
+using Clock = std::chrono::system_clock;
+using TimePoint = Clock::time_point;
+using Seconds = std::chrono::seconds;
 
 #define DEFAULT_RED_PIN 25
 #define DEFAULT_GREEN_PIN 26
@@ -17,7 +22,6 @@
 #define RGB_LIGHT_SETTINGS_ENDPOINT_PATH "/rest/rgbLightState"
 #define RGB_LIGHT_SETTINGS_SOCKET_PATH "/ws/rgbLightState"
 #define RGB_LIGHT_SETTINGS_FILE "/config/rgbLightState.json"
-
 
 struct RGBPins {
   int rPin, gPin, bPin;
@@ -39,16 +43,16 @@ struct RGBPins {
   }
 };
 
-struct RGBColour {
+struct RGBColor {
   int r, g, b;
 
-  RGBColour(int red, int green, int blue) : r(red), g(green), b(blue) {
+  RGBColor(int red = 0, int green = 0, int blue = 0) : r(red), g(green), b(blue) {
   }
 
-  bool operator==(const RGBColour& other) const {
+  bool operator==(const RGBColor& other) const {
     return r == other.r && g == other.g && b == other.b;
   }
-  bool operator!=(const RGBColour& other) const {
+  bool operator!=(const RGBColor& other) const {
     return !(*this == other);
   }
 
@@ -70,16 +74,16 @@ struct RGBColour {
 };
 
 struct Schedule {
-  time_t start;
-  time_t end;
-  RGBColour color;
+  TimePoint start;
+  TimePoint end;
+  RGBColor color;
 
-  Schedule(time_t s, time_t e, RGBColour c) : start(s), end(e), color(c) {
+  Schedule(TimePoint s = Clock::now(), TimePoint e = Clock::now() + Seconds(60), RGBColor c = RGBColor(0, 0, 0)) :
+      start(s), end(e), color(c) {
   }
 
   bool operator==(const Schedule& other) const {
-    return start == other.start && end == other.end && color.r == other.color.r && color.g == other.color.g &&
-           color.b == other.color.b;
+    return start == other.start && end == other.end && color == other.color;
   }
   bool operator!=(const Schedule& other) const {
     return !(*this == other);
@@ -105,8 +109,8 @@ class Schedules {
   static void serializeToJsonAndRead(const Schedules& schedules, JsonArray& schedulesArray) {
     for (const auto& schedule : schedules.schedules) {
       JsonObject scheduleObj = schedulesArray.createNestedObject();
-      scheduleObj["start"] = static_cast<long long>(schedule.start);  // Convert time_t to long long
-      scheduleObj["end"] = static_cast<long long>(schedule.end);
+      scheduleObj["start"] = std::chrono::duration_cast<Seconds>(schedule.start.time_since_epoch()).count();
+      scheduleObj["end"] = std::chrono::duration_cast<Seconds>(schedule.end.time_since_epoch()).count();
       JsonObject colorObj = scheduleObj.createNestedObject("color");
       colorObj["r"] = schedule.color.r;
       colorObj["g"] = schedule.color.g;
@@ -118,20 +122,28 @@ class Schedules {
     std::vector<Schedule> newSchedules;
 
     for (JsonObject scheduleObj : schedulesArray) {
-      time_t start = static_cast<time_t>(strtoll(scheduleObj["start"], nullptr, 10));
-      time_t end = static_cast<time_t>(strtoll(scheduleObj["end"], nullptr, 10));
+      if (!scheduleObj.containsKey("start") || !scheduleObj.containsKey("end") ||
+          !scheduleObj["color"].is<JsonObject>()) {
+        Serial.println("Missing schedule information");
+        continue;  // Skip malformed entries
+      }
+
+      auto start_seconds = Seconds(scheduleObj["start"].as<long long>());
+      auto end_seconds = Seconds(scheduleObj["end"].as<long long>());
+      TimePoint start = TimePoint(start_seconds);
+      TimePoint end = TimePoint(end_seconds);
 
       JsonObject colorObj = scheduleObj["color"];
       int r = colorObj["r"].as<int>();
       int g = colorObj["g"].as<int>();
       int b = colorObj["b"].as<int>();
 
-      newSchedules.push_back(Schedule(start, end, RGBColour(r, g, b)));
+      newSchedules.push_back(Schedule(start, end, RGBColor(r, g, b)));
     }
 
     // Compare new schedules with existing ones to determine if there's a change
     if (settings.schedules != newSchedules) {
-      settings.schedules = std::move(newSchedules);
+      settings.schedules.swap(newSchedules);
       return StateUpdateResult::CHANGED;
     }
 
@@ -146,20 +158,22 @@ class Schedules {
 class RGBLightState {
  public:
   RGBPins pins;
-  RGBColour color;
+  RGBColor color;
   Schedules schedules;
 
   RGBLightState() : pins(DEFAULT_RED_PIN, DEFAULT_GREEN_PIN, DEFAULT_BLUE_PIN), color(0, 0, 0) {
   }
 
   static void read(RGBLightState& settings, JsonObject& root) {
-    root["rPin"] = settings.pins.rPin;
-    root["gPin"] = settings.pins.gPin;
-    root["bPin"] = settings.pins.bPin;
+    JsonObject pinsJson = root.createNestedObject("pins");
+    pinsJson["rPin"] = settings.pins.rPin;
+    pinsJson["gPin"] = settings.pins.gPin;
+    pinsJson["bPin"] = settings.pins.bPin;
 
-    root["rValue"] = settings.color.r;
-    root["gValue"] = settings.color.g;
-    root["bValue"] = settings.color.b;
+    JsonObject colorJson = root.createNestedObject("color");
+    colorJson["r"] = settings.color.r;
+    colorJson["g"] = settings.color.g;
+    colorJson["b"] = settings.color.b;
 
     // Reading schedules
     JsonArray jsonSchedulesArray = root.createNestedArray("schedules");
@@ -169,23 +183,35 @@ class RGBLightState {
   static StateUpdateResult update(JsonObject& root, RGBLightState& lightState) {
     bool changed = false;
 
-    int rState = root["rValue"].as<int>();
-    int gState = root["gValue"].as<int>();
-    int bState = root["bValue"].as<int>();
-    int rPin = root["rPin"].as<int>();
-    int gPin = root["gPin"].as<int>();
-    int bPin = root["bPin"].as<int>();
+    Serial.println("Received JSON:");
+    serializeJsonPretty(root, Serial);
 
-    // Update colors if colours changed
-    if (lightState.color != RGBColour(rState, gState, bState)) {
-      lightState.color.setColor(rState, gState, bState);
-      changed = true;
+    if (root.containsKey("color") && root["color"].is<JsonObject>()) {
+      JsonObject colorJson = root["color"].as<JsonObject>();
+      int r = colorJson.containsKey("r") ? colorJson["r"].as<int>() : 0;
+      int g = colorJson.containsKey("g") ? colorJson["g"].as<int>() : 0;
+      int b = colorJson.containsKey("b") ? colorJson["b"].as<int>() : 0;
+
+      if (lightState.color != RGBColor(r, g, b)) {
+        lightState.color.setColor(r, g, b);
+        changed = true;
+      }
+    } else {
+      Serial.println("No color data found in JSON (update).");
     }
 
-    // Update pins if necessary
-    if (lightState.pins != RGBPins(rPin, gPin, bPin)) {
-      lightState.pins.setPins(rPin, gPin, bPin);
-      changed = true;
+    if (root.containsKey("pins") && root["pins"].is<JsonObject>()) {
+      JsonObject pinsJson = root["pins"].as<JsonObject>();
+      int rPin = pinsJson["rPin"].as<int>();
+      int gPin = pinsJson["gPin"].as<int>();
+      int bPin = pinsJson["bPin"].as<int>();
+
+      if (lightState.pins != RGBPins(rPin, gPin, bPin)) {
+        lightState.pins.setPins(rPin, gPin, bPin);
+        changed = true;
+      }
+    } else {
+      Serial.println("No pin data found in JSON (update).");
     }
 
     // Update schedules if necessary
@@ -208,7 +234,6 @@ class RGBLightStateService : public StatefulService<RGBLightState> {
   RGBLightStateService(AsyncWebServer* server, SecurityManager* securityManager, FS* fs);
   void begin();
   void loop();
-
   void updateRGBLedState(RGBLightState& state);
 
  private:
@@ -216,7 +241,7 @@ class RGBLightStateService : public StatefulService<RGBLightState> {
   WebSocketTxRx<RGBLightState> _webSocket;
   FSPersistence<RGBLightState> _fsPersistence;
 
-  time_t lastCheckTime = 0; 
+  TimePoint lastCheckTime = Clock::now();
 
   void onConfigUpdated(const String& originId);
 };

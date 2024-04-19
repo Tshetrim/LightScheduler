@@ -53,15 +53,12 @@ void setup() {
   // start the light service
   lightMqttSettingsService.begin();
 
-  esp32React.getNTPSettingsService();
-
   // start the server
   server.begin();
 }
 
 void loop() {
   // run the framework's loop function
-  // time_t is in seconds 
   esp32React.loop();
   rgbLightStateService.loop();
   loopPrintTime();

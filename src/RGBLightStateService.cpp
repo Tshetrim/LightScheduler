@@ -39,34 +39,30 @@ void RGBLightStateService::begin() {
 }
 
 void RGBLightStateService::loop() {
-  time_t currentTime = time(nullptr);
+  using namespace std::chrono;
 
-  // Check the schedules only once per second
-  if (_state.schedules.getSchedules().size() == 0 || currentTime - lastCheckTime < 1) {
+  TimePoint currentTime = Clock::now();
+  if (_state.schedules.schedules.size() == 0 || duration_cast<Seconds>(currentTime - lastCheckTime).count() < 1) {
     return;
   }
 
   lastCheckTime = currentTime;  // Update last check time
 
-  // Iterate through the schedules to find any that should currently be active
   bool foundActiveSchedule = false;
-  // Serial.println("Current Time:" +String(currentTime));
-  for (const auto& schedule : _state.schedules.getSchedules()) {
-    // Serial.println("Checking schedule: " + String(schedule.start) + " - " + String(schedule.end));
+  for (const auto& schedule : _state.schedules.schedules) {
     if (currentTime >= schedule.start && currentTime <= schedule.end) {
       if (_state.color != schedule.color) {
-        _state.color = schedule.color;  
-        updateRGBLedState(_state);      
+        _state.color = schedule.color;
+        updateRGBLedState(_state);
       }
       foundActiveSchedule = true;
       break;  // one active schedule at a time
     }
   }
 
-  // If no active schedule is found and the light is on, you might want to turn it off or revert to a default state
   if (!foundActiveSchedule && !_state.color.isOff()) {
     Serial.println("No active schedule found, reverting to default state.");
-    // _state.color = RGBColour(0, 0, 0);  // Reset to no color
+    // _state.color = RGBColor(0, 0, 0);  // Reset to no color
     updateRGBLedState(_state);
   }
 }

@@ -45,6 +45,38 @@ class FSPersistence {
     writeToFS();
   }
 
+  //     void readFromFS() {
+  //     File settingsFile = _fs->open(_filePath, "r");
+
+  //     if (!settingsFile) {
+  //         Serial.println("Failed to open settings file for reading");
+  //     } else {
+  //         DynamicJsonDocument jsonDocument(_bufferSize);
+  //         DeserializationError error = deserializeJson(jsonDocument, settingsFile);
+  //         if (error) {
+  //             Serial.print("Failed to deserialize JSON: ");
+  //             Serial.println(error.c_str());
+  //         } else {
+  //             Serial.println("JSON Deserialized successfully:");
+  //             serializeJsonPretty(jsonDocument, Serial);  // Print the JSON data to the serial port in a pretty
+  //             format
+
+  //             if (jsonDocument.is<JsonObject>()) {
+  //                 JsonObject jsonObject = jsonDocument.as<JsonObject>();
+  //                 _statefulService->updateWithoutPropagation(jsonObject, _stateUpdater);
+  //             } else {
+  //                 Serial.println("JSON is not an object");
+  //             }
+  //         }
+  //         settingsFile.close();
+  //     }
+
+  //     // If we reach here we have not been successful in loading the config
+  //     Serial.println("Applying defaults and writing them to FS.");
+  //     applyDefaults();
+  //     writeToFS();
+  // }
+
   bool writeToFS() {
     // create and populate a new json object
     DynamicJsonDocument jsonDocument = DynamicJsonDocument(_bufferSize);
