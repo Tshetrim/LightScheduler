@@ -42,6 +42,11 @@ void RGBLightStateService::loop() {
   using namespace std::chrono;
 
   TimePoint currentTime = Clock::now();
+
+  if (currentTime < lastCheckTime) {
+    lastCheckTime = currentTime;
+  }
+
   if (_state.schedules.schedules.size() == 0 || duration_cast<Seconds>(currentTime - lastCheckTime).count() < 1) {
     return;
   }
@@ -61,8 +66,7 @@ void RGBLightStateService::loop() {
   }
 
   if (!foundActiveSchedule && !_state.color.isOff()) {
-    Serial.println("No active schedule found, reverting to default state.");
-    // _state.color = RGBColor(0, 0, 0);  // Reset to no color
+    Serial.println("No active schedule found");
     updateRGBLedState(_state);
   }
 }
