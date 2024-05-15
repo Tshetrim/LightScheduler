@@ -14,6 +14,7 @@ export interface Schedule {
 	start: number;
 	end: number;
 	color: RGBColor;
+	daysActive: string[];
 }
 
 export interface Schedules {

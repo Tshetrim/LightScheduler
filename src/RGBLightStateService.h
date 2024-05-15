@@ -77,14 +77,40 @@ struct Schedule {
   TimePoint start;
   TimePoint end;
   RGBColor color;
+  std::vector<std::string> daysActive;
 
-  Schedule(TimePoint s = Clock::now(), TimePoint e = Clock::now() + Seconds(60), RGBColor c = RGBColor(0, 0, 0)) :
-      start(s), end(e), color(c) {
+  Schedule(TimePoint s = Clock::now(),
+           TimePoint e = Clock::now() + Seconds(60),
+           RGBColor c = RGBColor(0, 0, 0),
+           std::vector<std::string> days = {}) :
+      start(s), end(e), color(c), daysActive(days) {
+  }
+
+  bool isActiveOnDay(const std::string& day) const {
+    // If daysActive is empty, return false
+    if (daysActive.empty()) {
+      return false;
+    }
+    // If daysActive contains all seven days, return true
+    if (daysActive.size() == 7) {
+      return true;
+    }
+    // Else - search the list to see if the current day is active
+    return std::find(daysActive.begin(), daysActive.end(), day) != daysActive.end();
   }
 
   bool operator==(const Schedule& other) const {
-    return start == other.start && end == other.end && color == other.color;
+    if (start != other.start || end != other.end || color != other.color ||
+        daysActive.size() != other.daysActive.size()) {
+      return false;
+    }
+    auto sortedDays = daysActive;
+    auto sortedOtherDays = other.daysActive;
+    std::sort(sortedDays.begin(), sortedDays.end());
+    std::sort(sortedOtherDays.begin(), sortedOtherDays.end());
+    return sortedDays == sortedOtherDays;
   }
+
   bool operator!=(const Schedule& other) const {
     return !(*this == other);
   }
@@ -111,6 +137,10 @@ class Schedules {
       JsonObject scheduleObj = schedulesArray.createNestedObject();
       scheduleObj["start"] = std::chrono::duration_cast<Seconds>(schedule.start.time_since_epoch()).count();
       scheduleObj["end"] = std::chrono::duration_cast<Seconds>(schedule.end.time_since_epoch()).count();
+      JsonArray daysArray = scheduleObj.createNestedArray("daysActive");
+      for (const auto& day : schedule.daysActive) {
+        daysArray.add(day);
+      }
       JsonObject colorObj = scheduleObj.createNestedObject("color");
       colorObj["r"] = schedule.color.r;
       colorObj["g"] = schedule.color.g;
@@ -138,7 +168,12 @@ class Schedules {
       int g = colorObj["g"].as<int>();
       int b = colorObj["b"].as<int>();
 
-      newSchedules.push_back(Schedule(start, end, RGBColor(r, g, b)));
+      JsonArray daysJsonArray = scheduleObj["daysActive"];
+      std::vector<std::string> days;
+      for (auto day : daysJsonArray) {
+        days.push_back(day.as<std::string>());
+      }
+      newSchedules.push_back(Schedule(start, end, RGBColor(r, g, b), days));
     }
 
     // Compare new schedules with existing ones to determine if there's a change
@@ -186,6 +221,7 @@ class RGBLightState {
     Serial.println("Received JSON:");
     serializeJsonPretty(root, Serial);
 
+    // setting color from JSON
     if (root.containsKey("color") && root["color"].is<JsonObject>()) {
       JsonObject colorJson = root["color"].as<JsonObject>();
       int r = colorJson.containsKey("r") ? colorJson["r"].as<int>() : 0;
@@ -200,6 +236,7 @@ class RGBLightState {
       Serial.println("No color data found in JSON (update).");
     }
 
+    // setting pins from JSON
     if (root.containsKey("pins") && root["pins"].is<JsonObject>()) {
       JsonObject pinsJson = root["pins"].as<JsonObject>();
       int rPin = pinsJson["rPin"].as<int>();
@@ -214,7 +251,7 @@ class RGBLightState {
       Serial.println("No pin data found in JSON (update).");
     }
 
-    // Update schedules if necessary
+    // update schedules from JSON
     if (root.containsKey("schedules") && root["schedules"].is<JsonArray>()) {
       const JsonArray& schedulesArray = root["schedules"].as<JsonArray>();
       StateUpdateResult scheduleResult = Schedules::deserializeJsonAndUpdate(schedulesArray, lightState.schedules);
@@ -234,7 +271,8 @@ class RGBLightStateService : public StatefulService<RGBLightState> {
   RGBLightStateService(AsyncWebServer* server, SecurityManager* securityManager, FS* fs);
   void begin();
   void loop();
-  void updateRGBLedState(RGBLightState& state);
+  void updateRGBLedState();
+  void temporarilyUpdateRGBLedState(const RGBColor& color);
 
  private:
   HttpEndpoint<RGBLightState> _httpEndpoint;
@@ -242,6 +280,7 @@ class RGBLightStateService : public StatefulService<RGBLightState> {
   FSPersistence<RGBLightState> _fsPersistence;
 
   TimePoint lastCheckTime = Clock::now();
+  RGBColor currentColor = RGBColor(0, 0, 0);
 
   void onConfigUpdated(const String& originId);
 };

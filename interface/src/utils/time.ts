@@ -56,5 +56,17 @@ export const isEpochTimeActive = (startTimeEpoch: number, endTimeEpoch: number) 
 	return startTimeEpoch <= currentTime && endTimeEpoch >= currentTime;
 };
 
+export const isTimeWithin24HourWindow = (startTimeEpoch: number, endTimeEpoch: number) => {
+	const currentTime = new Date();
+	const startDate = new Date(startTimeEpoch * 1000);
+	const endDate = new Date(endTimeEpoch * 1000);
+
+	const currentSeconds = currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds();
+	const startSeconds = startDate.getHours() * 3600 + startDate.getMinutes() * 60 + startDate.getSeconds();
+	const endSeconds = endDate.getHours() * 3600 + endDate.getMinutes() * 60 + endDate.getSeconds();
+
+	return currentSeconds >= startSeconds && currentSeconds <= endSeconds;
+};
+
 const pluralize = (count: number, noun: string, suffix: string = "s") =>
 	` ${count} ${noun}${count !== 1 ? suffix : ""} `;

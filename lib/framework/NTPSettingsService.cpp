@@ -6,7 +6,7 @@ NTPSettingsService::NTPSettingsService(AsyncWebServer* server, FS* fs, SecurityM
     _timeHandler(TIME_PATH,
                  securityManager->wrapCallback(
                      std::bind(&NTPSettingsService::configureTime, this, std::placeholders::_1, std::placeholders::_2),
-                     AuthenticationPredicates::IS_ADMIN)) {
+                     AuthenticationPredicates::IS_AUTHENTICATED)) {
   _timeHandler.setMethod(HTTP_POST);
   _timeHandler.setMaxContentLength(MAX_TIME_SIZE);
   server->addHandler(&_timeHandler);
